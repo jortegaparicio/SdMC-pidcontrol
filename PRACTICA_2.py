@@ -14,6 +14,8 @@ import scipy.signal as ss
 from scipy.integrate import odeint
 import control
 
+plt.close('all')
+
 #%% Parameters
 
 if __name__ == "__main__":
@@ -176,6 +178,7 @@ if __name__ == "__main__":
     
     #%% PID controller
     
+    pids = []
     plt.figure()
     for sd in sds:
             
@@ -214,7 +217,9 @@ if __name__ == "__main__":
             
         print(f'K is: {K}')
         T = control.feedback(G,K*Gc);
-            
+        
+        pids.append(K*Gc)
+        
         t, theta = control.step_response(T)
         plt.plot(t,theta, label=f'PID {sds.index(sd)+1}')
     
@@ -227,23 +232,29 @@ if __name__ == "__main__":
     
     #%% Perturbations with PID controller
     
-    H = 1
-    theta_ref = 0
-    
-    aux1 = control.parallel(theta_ref, -H)
-    aux2 = control.series(aux1, Gc)
-    system = control.feedback(G,K*aux2,sign=1)
-    
     # Perturbation response 
     P = np.random.uniform(-0.25,0.25)
     print(f'Perturbation force is: {P} N')
-    
-    plt.figure()    
-    t, out = control.step_response(system)
-    plt.plot(t,P*out)
-    plt.title('Perturbation response with PID controller')
-    plt.xlabel('time (s)')
+        
+    plt.figure() 
+    for pid in pids:
+        
+        H = 1
+        theta_ref = 0
+        
+        aux1 = control.parallel(theta_ref, -H)
+        system = control.feedback(G,pid*aux1,sign=1)
+        
+        t, out = control.step_response(system)
+        plt.plot(t,P*out, label=f'PID {pids.index(pid)+1}')
+        
+    plt.title(f'Perturbation response with PID controller and P={np.round(P,3)} N')
+    plt.grid(alpha=0.3)
     plt.ylabel('$\\theta$ (rad)')
+    plt.xlabel('time (s)')
+    plt.show()
+    plt.legend()
+
     
     #%% Calculating IAE, ISE, ITSE, ITAE
     
