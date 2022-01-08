@@ -60,39 +60,56 @@ if __name__ == "__main__":
     print(f'tp <= {tp_max}')
     
     # Selecting design values
+    sds = []
+    for i in range(4):
     
-    # PID 1
-    # ts = 3.6
-    # tp = 7
+        # PID 1
+        if i == 0:
+            ts = 3.6
+            tp = 7
+        
+        if i == 1:
+        # PID 2
+            ts = 3.6
+            tp = 1
+      
+        if i == 2:
+        # PID 3
+            ts = 1.9
+            tp = 1
+        
+        if i == 3:
+        # PID 4
+            ts = 3.3
+            tp = 0.5
+        
+        C_5 = 3     # 5% criterion
     
-    # PID 2
+        # Design point (complex plane)
+        sigma = C_5 / ts
+        w_d = np.pi / tp
+            
+        # tan_theta = -np.pi/(np.log(Mp))
+        # w_d = sigma*tan_theta
+        
+        sds.append(complex(-sigma,w_d))
+        
+    print(f'Sd={sds}')
+    
     ts = 3.6
     tp = 1
-    
-    # PID 3
-    # ts = 1.9
-    # tp = 1
-    
-    C_5 = 3     # 5% criterion
-
     # Design point (complex plane)
     sigma = C_5 / ts
     w_d = np.pi / tp
-        
-    # tan_theta = -np.pi/(np.log(Mp))
-    # w_d = sigma*tan_theta
-    
-    sd = complex(-sigma,w_d)
-    
-    print(f'Sd={sd}')
 
+    sd = (complex(-sigma,w_d)) 
+   
 #%% Linearized system using small angles approximation
     
-    # We stabilize the system around theta = pi -> tetha = pi + phi, where phi is de deviation
-    # from the equilibrium point theta = pi.
+    # We stabilize the system around theta = 0.
     
     # We will assume that the system stays within a small neighborhood of this equillbrium in theta = pi
-    # Where: sin(theta) = sin(pi + phi)~ -phi, cos(theta) = cos(pi + phi) ~ -1 and theta_dot² = pi² * phi_dot² ~ 0
+    # Where: sin(theta) = -theta, cos(theta) ~ -1 and theta_dot² ~ 0
     
     def linealizeSystem(params):
         
@@ -135,54 +152,78 @@ if __name__ == "__main__":
 
     # Original system root locus
     plt.figure()
+   
+    plt.plot(-0.83333, 0.4487, marker='x', markersize=10, label='PID 1')
+    plt.plot(-0.83333, 0.415, marker='x', markersize=10, label='PID 2')
+    plt.plot(-0.5789, 3.14159, marker='x', markersize=10, label='PID 3')
+    plt.plot(-0.9090, 6.28318, marker='x', markersize=10, label='PID 4')
     control.root_locus(G)
-    plt.plot(-sigma,w_d, marker='x', markersize=10, markerfacecolor='g')
+    plt.legend()
+    
+    # plt.plot(-sigma, w_d, marker='x', markersize=10, markerfacecolor='g')
     
     # Original system step response
     plt.figure()
-    t, theta = control.step_response(G)
+    t = np.linspace(0,1,100)
+    _, theta = control.step_response(G, T=t)
     plt.plot(t,theta)
+    plt.title('$\\theta$ variation along time in Linealized system')
+    plt.grid(alpha=0.3)
+    plt.ylabel('$\\theta$ (rad)')
+    plt.xlabel('time (s)')
+    plt.show()
   
     
     #%% PID controller
     
-    ################ only valid for this G transfer function
-    numerator = control.tf([4.54545455, 0],[1])
-    denominator = control.tf([1, 0.18181818,-31.21363636,-4.45909091],[1])
-    ##############
+    plt.figure()
+    for sd in sds:
+            
+        #Only valid for this G transfer function
+        numerator = control.tf([4.54545455, 0],[1])
+        denominator = control.tf([1, 0.18181818,-31.21363636,-4.45909091],[1])
+            
+        argumento = np.angle(numerator(sd), deg=True) - np.angle(denominator(sd), deg=True)
+        print(f'argumento: {argumento} degrees')
+            
+        # We add a pole in zero and calculate beta.
+        beta_prima = 180 + np.angle(denominator(sd)*sd, deg=True) - np.angle(numerator(sd), deg=True)
+        print(f'beta: {beta_prima} degrees')
+            
+        # We establish two poles to satisfy the argument criterion
+        a = w_d/(np.tan(np.deg2rad(55))) + sigma
+        b = w_d/(np.tan(np.deg2rad(beta_prima-55))) + sigma
+            
+        print(f'\nAdd pole in a: {a}')
+        print(f'Add pole in b: {b}')
+            
+        num = np.flip(np.polynomial.Polynomial.fromroots((-a,-b)).coef)  
+        Gc = control.tf(num,[1,0])
+            
+        print(f'\nController, Gc is = {Gc}')
+            
+        arg = np.round(np.angle(G(sd)*Gc(sd), deg=True),4)
+        print(f'Argument criterion with Gc: {arg} degrees')
+            
+        # Now, we adjust gain K
+            
+        # K calculation
+        T_s = G*Gc
+        T_sd = T_s(sd)
+        K = 1/np.abs(T_sd)
+            
+        print(f'K is: {K}')
+        T = control.feedback(G,K*Gc);
+            
+        t, theta = control.step_response(T)
+        plt.plot(t,theta, label=f'PID {sds.index(sd)+1}')
     
-    argumento = np.angle(numerator(sd), deg=True) - np.angle(denominator(sd), deg=True)
-    print(f'argumento: {argumento} degrees')
-    
-    # We add a pole in zero and calculate beta.
-    beta_prima = 180 + np.angle(denominator(sd)*sd, deg=True) - np.angle(numerator(sd), deg=True)
-    print(f'beta: {beta_prima} degrees')
-    
-    # We establish two poles to satisfy the argument criterion
-    a = w_d/(np.tan(np.deg2rad(55))) + sigma
-    b = w_d/(np.tan(np.deg2rad(beta_prima-55))) + sigma
-    
-    print(f'\nAdd pole in a: {a}')
-    print(f'Add pole in b: {b}')
-    
-    num = np.flip(np.polynomial.Polynomial.fromroots((-a,-b)).coef)  
-    #Gc = control.tf([1,7,12],[1,0])
-    Gc = control.tf(num,[1,0])
-    
-    print(f'\nController, Gc is = {Gc}')
-    
-    arg = np.round(np.angle(G(sd)*Gc(sd), deg=True),4)
-    print(f'Argument criterion with Gc: {arg} degrees')
-    
-    # Now, we adjust gain K
-    
-    # K calculation
-    T_s = G*Gc
-    T_sd = T_s(sd)
-    K = 1/np.abs(T_sd)
-    
-    print(f'K is: {K}')
-    T = control.feedback(G,K*Gc);
+    plt.title('$\\theta$ variation along time in Linealized system with PID controller')
+    plt.grid(alpha=0.3)
+    plt.ylabel('$\\theta$ (rad)')
+    plt.xlabel('time (s)')
+    plt.show()
+    plt.legend()
     
     #%% Perturbations with PID controller
     
