@@ -248,7 +248,7 @@ if __name__ == "__main__":
         t, out = control.step_response(system)
         plt.plot(t,P*out, label=f'PID {pids.index(pid)+1}')
         
-    plt.title(f'Perturbation response with PID controller and P={np.round(P,3)} N')
+    plt.title(f'Perturbation response with PID controller and p(t)={np.round(P,3)}u(t) N')
     plt.grid(alpha=0.3)
     plt.ylabel('$\\theta$ (rad)')
     plt.xlabel('time (s)')
@@ -258,55 +258,104 @@ if __name__ == "__main__":
     
     #%% Calculating IAE, ISE, ITSE, ITAE
     
-    T_prima = control.feedback(K*Gc*G, H);
-    time, theta_out = control.step_response(T_prima)
-    
-    # theta_ref = 0 -> inverted pendulum
+    time = np.linspace(0,8,1000)
+    errors = []
     plt.figure()
-    error = 1-theta_out
-    plt.plot(time, error, label='error')
-    plt.plot(time, np.abs(error), label='absolute error')
+    for pid in pids:
+        T = control.feedback(pid*G, H);
+        _, theta_out = control.step_response(T, T=time)
+    
+        error = 1-theta_out
+        errors.append(error)
+        plt.plot(time, abs(error), label=f'absolute error PID={pids.index(pid)+1}')
+        
+    
+    plt.title(f'Absolute error variation along time')
+    plt.grid(alpha=0.3)
+    plt.ylabel('error')
+    plt.xlabel('time (s)')
+    plt.show()
     plt.legend()
     
-    
-    plt.figure()
     # ISE
-    count = 0
-    ISE = []
-    for i in error**2:
-        count = count + i 
-        ISE.append(count)
+    plt.figure()
+
+    for pid in pids:
+        count = 0
+        ISE = []
+        
+        for i in errors[pids.index(pid)]**2:
+            count = count + i 
+            ISE.append(count)
+        
+        plt.plot(time, ISE, label='ISE')
     
-    plt.plot(time, ISE, label='ISE')
+    plt.title('ISE')
+    plt.grid(alpha=0.3)
+    plt.ylabel('ISE')
+    plt.xlabel('time (s)')
+    plt.show()
+    plt.legend()
     
     # IAE
-    count = 0
-    IAE = []
-    for i in np.abs(error):
-        count = count + i 
-        IAE.append(count)
+    plt.figure()
+
+    for pid in pids:
+        count = 0
+        IAE = []
+        
+        for i in np.abs(errors[pids.index(pid)]):
+            count = count + i 
+            IAE.append(count)
+        
+        plt.plot(time, IAE, label='IAE')
     
-    plt.plot(time, IAE, label='IAE')
+    plt.title('IAE')
+    plt.grid(alpha=0.3)
+    plt.ylabel('IAE')
+    plt.xlabel('time (s)')
+    plt.show()
+    plt.legend()
     
-    # ITSE
-    count = 0
-    ITSE = []
-    for i in time*error**2:
-        count = count + i 
-        ITSE.append(count)
+     # ITSE
+    plt.figure()
+
+    for pid in pids:
+        count = 0
+        ITSE = []
+        
+        for i in time*errors[pids.index(pid)]**2:
+            count = count + i 
+            ITSE.append(count)
+        
+        plt.plot(time, ITSE, label='ITSE')
     
-    plt.plot(time, ITSE, label='ITSE')
+    plt.title('ITSE')
+    plt.grid(alpha=0.3)
+    plt.ylabel('ITSE')
+    plt.xlabel('time (s)')
+    plt.show()
+    plt.legend()
     
     # ITAE
-    count = 0
-    ITAE = []
-    for i in time*np.abs(error):
-        count = count + i 
-        ITAE.append(count)
+    plt.figure()
+
+    for pid in pids:
+        count = 0
+        ITAE = []
+        
+        for i in time*np.abs(errors[pids.index(pid)]):
+            count = count + i 
+            ITAE.append(count)
+        
+        plt.plot(time, ITAE, label='ITAE')
     
-    plt.plot(time, ITAE, label='ITAE')
-    plt.legend()    
-   
+    plt.title('ITAE')
+    plt.grid(alpha=0.3)
+    plt.ylabel('ITAE')
+    plt.xlabel('time (s)')
+    plt.show()
+    plt.legend()
 
     
 #%% Non-linear
@@ -337,161 +386,3 @@ def f(xVec, t, params):
     #%% Calculating Non linear sistem (EDOs)
       
     xNL = odeint(f, xRef + deltaX, t, args=([M,m,L,b,u,R,g],))
-
-   #%%
-   
-    """# practica 2
-    def linealizeSystem(params):
-        
-        # System constants
-        M,m,L,b,u,R,g = params
-
-        # Where dot_x2 = -b*gamma*x_2 + beta*x_3+gamma*u
-        gamma = (I+m*L**2)/(I*(M+m)+M*m*L**2)
-        beta = -(m**2*L**2*g)/(I*(M+m)+M*m*L**2)
-        
-        # Where dot_x4 = -b*phi*x_2 + alpha*x_3+phi*u
-        tau = -(m*L)/(I*(M+m)+M*m*L**2)
-        alpha = (m*g*L*(m+M))/(I*(M+m)+M*m*L**2)
-    
-        # Creating Space state
-        A = np.array([[0,1,0,0],[0,-b*gamma,beta,0],[0,0,0,1],[0,-b*tau,alpha,0]])
-        B = np.array([[0],[gamma],[0],[tau]])
-        C = np.array([0,0,1,0])
-        D = np.array([0])
-    
-        return A,B,C,D
-    
-    # practica 2 true
-    def linealizeSystem(params):
-        
-        # System constants
-        M,m,L,b,u,R,g = params
-
-        # Where dot_x2 = -b*gamma*x_2 + beta*x_3+gamma*u
-        v1 = (M+m)/(I*(M+m)+m*M*L**2)
-        v2 = (I+m*L**2)/(I*(M+m)+m*M*L**2)
-    
-        # Creating Space state
-        A = np.array([[0,1,0,0],[0,-b*v2,-((m**2*L**2*g*v2)/(I+m*L**2)),0],[0,0,0,1],[0,(m*L*b*v2)/(M+m),m*g*L*v1,0]])
-        B = np.array([[0],[v2],[0],[-((m*L*v1)/(M+m))]])
-        C = np.array([0,0,1,0])
-        D = np.array([0])
-    
-        return A,B,C,D
-    
-       
-    A,B,C,D = linealizeSystem([M,m,L,b,u,R,g])
-    linearizedSystem = control.ss(A,B,C,D)
-    
-    # Original System
-    G = control.ss2tf(linearizedSystem)
-    
-    # Removing values near to 0
-    den = np.around(G.den,decimals=12)
-    num = np.around(G.num,decimals=12)
-    G= control.tf(num,den)
-    G_poles = G.pole()
-    G_zeros = G.zero()
-    
-    print(f'\nLinealized system transfer function is:\n{G}')
-    print(f'\nLinealized system Poles at:\n {G_poles}')
-    print(f'\nLinealized system Zeros at:\n {G_zeros}')"""
-
-    """WEB:
-    plt.figure(1)
-    control.root_locus(G)
-    
-    add_pole = control.tf([1],[1,0])
-    G_zero = G*add_pole
-    plt.figure(2)
-    control.root_locus(G_zero)
-    
-    # zeros in -3 and -4, pole in 0
-    Gc = control.tf([1,7,12],[1,0])
-    
-    K = 20
-    T = control.feedback(G,K*Gc)
-    plt.figure(3)
-    control.sisotool(T)
-    
-    print(Gc)
-    print(G)
-    print(T)"""
-    
-   
-      
-    """
-    #%% PID controller design
-
-    # Argument criterion
-    
-    arg = np.angle(G(sd), deg=True)
-    print(f'\nargument {arg}º = 180º?')
-    
-    # PID controller: Gc = (s+a)(s+b)/s
-    
-    # b* calculation
-    # b = np.abs(0.1 * (-0.14283166))
-    Gc = control.tf([1,b],[1,0])
-
-    
-    
-    #%%
-    plt.figure()
-    #control.sisotool(G*Gc)
-    control.sisotool(T)
-     
-    plt.figure()
-    control.root_locus(G*Gc)
-    plt.plot(-sigma,w_d, marker='x', markersize=10, markerfacecolor='g')
-    
-    # Gc = control.tf([1,a],[1])
-    
-    plt.figure()
-    t, out = control.step_response(T)
-    plt.plot(t,out)
-
-    ###############
-    #%%
-    
-    # a calculation
-        # Beta calculation:
-  
-    beta = 180 - np.angle(G(sd), deg=True)
-    # a = np.abs(w_d/(np.tan(np.deg2rad(beta))) + sigma)
-    
-    # K calculation
-    # T_s = G*Gc
-    # T_sd = T_s(sd)
-    #K = 1/np.abs(T_sd)
-    K=1
-    
-  #  num = np.polynomial.Polynomial.fromroots((a, b)).coef
-    num = np.flip(np.polynomial.Polynomial.fromroots((-10,-5)).coef)
-    #K = 20
-    
-    #Gc = control.tf([1,7,12],[1,0])
-     
-    Gc = control.tf(num,[1,0])
-  
-    print(f'Gc is = {Gc}')
-    
-    T = control.feedback(G,K*Gc);
-    
-    plt.figure()
-    #control.sisotool(G*Gc)
-    control.sisotool(T)
-     
-    plt.figure()
-    control.root_locus(T)
-    plt.plot(-sigma,w_d, marker='x', markersize=10, markerfacecolor='g')
-    
-    # Gc = control.tf([1,a],[1])
-  
-    
-    plt.figure()
-    t, out = control.step_response(T)
-    plt.plot(t,out)
-
-    """
