@@ -383,3 +383,56 @@ def f(xVec, t, params):
     #%% Calculating Non linear sistem (EDOs)
       
     xNL = odeint(f, xRef + deltaX, t, args=([M,m,L,b,u,R,g],))
+
+    #%% Posición del carrito
+    
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import scipy.signal as ss
+    from scipy.integrate import odeint
+    import control
+    
+    # Valores de las variables    
+    u = 1      # Similar to a step reponse
+    g = 9.81    
+    L = 0.3
+    m = 0.2
+    I = 0.006
+    M = 0.5
+    b = 0.1
+    
+    # Funcion de transferencia que relaciona la entrada con la posición del carrito
+    num = [1]
+    den = [(M+m)-((m**2*L**2)/(I+m*L**2)), b, 0]
+    
+    G = control.tf(num,den)
+    G_poles = G.pole()
+    G_zeros = G.zero()
+    
+    print(f'G = {G}')
+    print(f'Polos = {G_poles}')
+    print(f'Ceros = {G_zeros}')
+    
+    plt.figure()
+    t = np.linspace(0,25,100)
+    _, theta = control.impulse_response(G, T=t)
+    plt.plot(t,theta)
+    plt.title('$\\Delta x$ variation along time in Linealized system')
+    plt.grid(alpha=0.3)
+    plt.ylabel('$\\Delta x$ (m)')
+    plt.xlabel('time (s)')
+    plt.show()
+    
+    plt.figure() 
+    for pid in pids:
+        system = control.feedback(G,pid*-1,sign=1)
+        
+        t, out = control.step_response(system)
+        plt.title('$\\Delta x$ variation along time in Linealized system')
+        plt.grid(alpha=0.3)
+        plt.ylabel('$\\Delta x$ (m)')
+        plt.xlabel('time (s)')
+        plt.plot(t,out, label=f'PID {pids.index(pid)+1}')
+        plt.legend()
+    
+
