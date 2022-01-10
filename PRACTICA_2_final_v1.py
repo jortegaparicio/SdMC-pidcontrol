@@ -209,15 +209,15 @@ if __name__ == "__main__":
         # K calculation
         T_s = G*Gc
         T_sd = T_s(sd)
-        Kp = 1/np.abs(T_sd)
-        print(f'K is: {Kp}')
+        K = 1/np.abs(T_sd)
+        print(f'K is: {K}')
         
-        pids.append(Kp*Gc)
+        pids.append(K*Gc)
         
-        theta_ref = 0.1 #rad
-        sys = control.feedback(Kp*Gc*G, 1);
+        theta_ref = np.pi/2 #rad
+        sys = control.feedback(K*Gc*G, 1);
         t, theta = control.step_response(sys)
-        plt.plot(t,theta, label=f'PID {sds.index(sd)+1}')
+        plt.plot(t,theta*theta_ref, label=f'PID {sds.index(sd)+1}')
         
     
     plt.title('$\\theta$ variation along time in Linealized system with PID controller')
